@@ -73,7 +73,7 @@ def main():
             if current_homework_status != message:
                 send_message(message)
                 current_homework_status = message
-            time.sleep(5 * 60)  # Опрашивать раз в пять минут
+            time.sleep(15 * 60)  # Опрашивать раз в пять минут
         except Exception as e:
             logging.error(f'Бот упал с ошибкой: {e}')
             send_message(f'Бот упал с ошибкой: {e}')
