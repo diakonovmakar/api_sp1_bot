@@ -11,6 +11,10 @@ load_dotenv()
 PRAKTIKUM_TOKEN = os.getenv('PRAKTIKUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+URL = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
+
+MIN_5 = 5 * 60
+SEC_5 = 5
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -24,29 +28,50 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
 
 def parse_homework_status(homework):
-    try:
-        homework_instance = homework['homeworks'][0]
-    except KeyError:
-        homework_instance = homework
-    except IndexError:
-        return 'Нет работ доступных к рассмотрению'
-    homework_name = homework_instance['homework_name']
-    if homework_instance['status'] == 'reviewing':
-        return f'Ваша работа {homework_name} принята. Ждём ревью.'
-    if homework_instance['status'] == 'rejected':
-        verdict = 'К сожалению, в работе нашлись ошибки.'
-    else:
-        verdict = 'Ревьюеру всё понравилось, работа зачтена!'
-    return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
+    homework_name = homework['homework_name']
+    statuses = {
+        'reviewing': f'Ваша работа "{homework_name}" принята. Ждём ревью.',
+        'rejected': (
+            f'У вас проверили работу "{homework_name}"!'
+            ' \n\nК сожалению, в работе нашлись ошибки.'),
+        'approved': (
+            f'У вас проверили работу "{homework_name}"!'
+            '\n\nРевьюеру всё понравилось, работа зачтена!')
+    }
+
+    for status, verdict in statuses.items():
+        if homework['status'] == status:
+            logging.info(f'У работы {homework_name} статус {status}')
+            return verdict
+    return None
 
 
 def get_homeworks(current_timestamp):
-    url = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
     headers = {'Authorization': f'OAuth {PRAKTIKUM_TOKEN}'}
     payload = {'from_date': current_timestamp}
-    homework_statuses = requests.get(url, headers=headers, params=payload)
-    logging.debug(f'Запрос вернул следующий ответ {homework_statuses.json()}')
-    return homework_statuses.json()
+    try:
+        homework_statuses = requests.get(URL, headers=headers, params=payload)
+    except requests.ConnectionError as e:
+        error = logging.error(
+            'Ошибка соединения. Проверьте подключение'
+            ' к интернету. \n\nОшибка: ' + str(e))
+        print(str(e))
+    except requests.Timeout as e:
+        error = logging.error('Время ожидания истекло. \n\nОшибка: ' + str(e))
+        send_message(error)
+    except requests.RequestException as e:
+        error = logging.error('Общая ошибка:\n\n' + str(e))
+        send_message(error)
+
+    try:
+        result = homework_statuses.json()
+        logging.debug(f'Запрос вернул следующий ответ {result}')
+    except ValueError:
+        error = logging.error(
+            'Не удастся десериализовать JSON'
+            'полученный из запроса.')
+        send_message(error)
+    return result
 
 
 def send_message(message):
@@ -54,30 +79,31 @@ def send_message(message):
     return bot.send_message(CHAT_ID, message)
 
 
-"""         if current_homework != homework:
-                homework = current_homework
-            else:
-                logging.debug('Изменений нет')
-                time.sleep(5)
-                continue"""
-
-
 def main():
     logging.debug('Бот запущен')
-    current_timestamp = int(time.time())  # Начальное значение timestamp
-    current_homework_status = ''
+    current_timestamp = int(time.time())
+
+    sent_message = ''
     while True:
         try:
             homework = get_homeworks(current_timestamp)
-            message = parse_homework_status(homework)
-            if current_homework_status != message:
+            current_timestamp = homework['current_date']
+            if homework['homeworks']:
+                homework = homework['homeworks'][0]
+                message = parse_homework_status(homework)
+            elif len(homework['homeworks']) == 0:
+                message = 'Нет работ доступных к рассмотрению'
+            else:
+                message = parse_homework_status(homework)
+
+            if sent_message != message:
                 send_message(message)
-                current_homework_status = message
-            time.sleep(15 * 60)  # Опрашивать раз в пять минут
+                sent_message = message
+            time.sleep(MIN_5)
         except Exception as e:
             logging.error(f'Бот упал с ошибкой: {e}')
             send_message(f'Бот упал с ошибкой: {e}')
-            time.sleep(5)
+            time.sleep(SEC_5)
 
 
 if __name__ == '__main__':
