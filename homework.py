@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import time
@@ -30,7 +31,6 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 def parse_homework_status(homework):
     homework_name = homework['homework_name']
     statuses = {
-        'reviewing': f'Ваша работа "{homework_name}" принята. Ждём ревью.',
         'rejected': (
             f'У вас проверили работу "{homework_name}"!'
             ' \n\nК сожалению, в работе нашлись ошибки.'),
@@ -51,27 +51,20 @@ def get_homeworks(current_timestamp):
     payload = {'from_date': current_timestamp}
     try:
         homework_statuses = requests.get(URL, headers=headers, params=payload)
-    except requests.ConnectionError as e:
-        error = logging.error(
-            'Ошибка соединения. Проверьте подключение'
-            ' к интернету. \n\nОшибка: ' + str(e))
-        print(str(e))
-    except requests.Timeout as e:
-        error = logging.error('Время ожидания истекло. \n\nОшибка: ' + str(e))
-        send_message(error)
-    except requests.RequestException as e:
-        error = logging.error('Общая ошибка:\n\n' + str(e))
-        send_message(error)
-
-    try:
         result = homework_statuses.json()
         logging.debug(f'Запрос вернул следующий ответ {result}')
-    except ValueError:
-        error = logging.error(
+        return result
+    except requests.RequestException as e:
+        error = ('Ошибка:\n\n' + str(e))
+        logging.error(error)
+        return send_message(error)
+    except json.decoder.JSONDecodeError as e:
+        error = (
             'Не удастся десериализовать JSON'
-            'полученный из запроса.')
-        send_message(error)
-    return result
+            'полученный из запроса.'
+            f'\n\nОшибка: {str(e)}')
+        logging.error(error)
+        return send_message(error)
 
 
 def send_message(message):
@@ -83,7 +76,7 @@ def main():
     logging.debug('Бот запущен')
     current_timestamp = int(time.time())
 
-    sent_message = ''
+    sent_message = None
     while True:
         try:
             homework = get_homeworks(current_timestamp)
@@ -92,9 +85,7 @@ def main():
                 homework = homework['homeworks'][0]
                 message = parse_homework_status(homework)
             elif len(homework['homeworks']) == 0:
-                message = 'Нет работ доступных к рассмотрению'
-            else:
-                message = parse_homework_status(homework)
+                message = 'Нет работ доступных к рассмотрению.'
 
             if sent_message != message:
                 send_message(message)
