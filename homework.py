@@ -31,6 +31,7 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 def parse_homework_status(homework):
     homework_name = homework['homework_name']
     statuses = {
+        'reviewing': f'Ваша работа "{homework_name}" принята. Ждём ревью.',
         'rejected': (
             f'У вас проверили работу "{homework_name}"!'
             ' \n\nК сожалению, в работе нашлись ошибки.'),
@@ -39,10 +40,9 @@ def parse_homework_status(homework):
             '\n\nРевьюеру всё понравилось, работа зачтена!')
     }
 
-    for status, verdict in statuses.items():
-        if homework['status'] == status:
-            logging.info(f'У работы {homework_name} статус {status}')
-            return verdict
+    for status in statuses.keys():
+        logging.info(f'У работы {homework_name} статус {status}')
+        return statuses[f'{status}']
     return None
 
 
@@ -64,7 +64,7 @@ def get_homeworks(current_timestamp):
             'полученный из запроса.'
             f'\n\nОшибка: {str(e)}')
         logging.error(error)
-        return send_message(error)
+        return {}
 
 
 def send_message(message):
