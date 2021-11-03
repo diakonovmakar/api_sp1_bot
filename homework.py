@@ -12,7 +12,7 @@ load_dotenv()
 PRAKTIKUM_TOKEN = os.getenv('PRAKTIKUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
-URL = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
+URL = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 
 MIN_5 = 5 * 60
 SEC_5 = 5
@@ -40,9 +40,10 @@ def parse_homework_status(homework):
             '\n\nРевьюеру всё понравилось, работа зачтена!')
     }
 
-    for status in statuses.keys():
-        logging.info(f'У работы {homework_name} статус {status}')
-        return statuses[f'{status}']
+    for status, verdict in statuses.items():
+        if homework['status'] == status:
+            logging.info(f'У работы {homework_name} статус {status}')
+            return verdict
     return None
 
 
@@ -57,7 +58,7 @@ def get_homeworks(current_timestamp):
     except requests.RequestException as e:
         error = ('Ошибка:\n\n' + str(e))
         logging.error(error)
-        return send_message(error)
+        return {}
     except json.decoder.JSONDecodeError as e:
         error = (
             'Не удастся десериализовать JSON'
@@ -74,15 +75,17 @@ def send_message(message):
 
 def main():
     logging.debug('Бот запущен')
-    current_timestamp = int(time.time())
+    current_timestamp = 0
 
     sent_message = None
     while True:
         try:
-            homework = get_homeworks(current_timestamp)
-            current_timestamp = homework['current_date']
-            if homework['homeworks']:
-                homework = homework['homeworks'][0]
+            homeworks = get_homeworks(current_timestamp)
+            current_timestamp = homeworks['current_date']
+            homework = homeworks['homeworks']
+            print(homework)
+            if homework[0]:
+                homework = homework[0]
                 message = parse_homework_status(homework)
             elif len(homework['homeworks']) == 0:
                 message = 'Нет работ доступных к рассмотрению.'
@@ -93,9 +96,11 @@ def main():
             time.sleep(MIN_5)
         except Exception as e:
             logging.error(f'Бот упал с ошибкой: {e}')
-            send_message(f'Бот упал с ошибкой: {e}')
+            message = f'Бот упал с ошибкой: {e}'
+            if sent_message != message:
+                send_message(message)
+                sent_message = message
             time.sleep(SEC_5)
-
 
 if __name__ == '__main__':
     main()
