@@ -102,5 +102,6 @@ def main():
                 sent_message = message
             time.sleep(SEC_5)
 
+
 if __name__ == '__main__':
     main()
