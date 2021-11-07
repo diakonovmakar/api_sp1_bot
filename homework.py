@@ -82,11 +82,10 @@ def main():
             homeworks = get_homeworks(current_timestamp)
             current_timestamp = homeworks['current_date']
             homework = homeworks['homeworks']
-            print(homework)
-            if homework[0]:
+            if len(homework) > 0:
                 homework = homework[0]
                 message = parse_homework_status(homework)
-            elif len(homework['homeworks']) == 0:
+            elif len(homework) == 0:
                 message = 'Нет работ доступных к рассмотрению.'
 
             if sent_message != message:
@@ -96,6 +95,7 @@ def main():
         except Exception as e:
             logging.error(f'Бот упал с ошибкой: {e}')
             message = f'Бот упал с ошибкой: {e}'
+
             if sent_message != message:
                 send_message(message)
                 sent_message = message
