@@ -76,7 +76,6 @@ def send_message(message):
 def main():
     logging.debug('Бот запущен')
     current_timestamp = 0
-
     sent_message = None
     while True:
         try:
