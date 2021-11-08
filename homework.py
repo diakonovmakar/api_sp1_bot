@@ -29,7 +29,7 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
 
 def parse_homework_status(homework):
-    """Парсит .json от АПИ Практикума и возвращает вердикт"""
+    """Парсит .json от АПИ Практикума и возвращает вердикт."""
     homework_name = homework['homework_name']
     statuses = {
         'reviewing': f'Ваша работа "{homework_name}" принята. Ждём ревью.',
@@ -49,7 +49,7 @@ def parse_homework_status(homework):
 
 
 def get_homeworks(current_timestamp):
-    """Получает .json от АПИ Практикума"""
+    """Получает .json от АПИ Практикума."""
     headers = {'Authorization': f'OAuth {PRAKTIKUM_TOKEN}'}
     payload = {'from_date': current_timestamp}
     try:
@@ -71,13 +71,13 @@ def get_homeworks(current_timestamp):
 
 
 def send_message(message):
-    """Отправляет сообщение в бот"""
+    """Отправляет сообщение в бот."""
     logging.info('Бот отправил сообщение юзеру')
     return bot.send_message(CHAT_ID, message)
 
 
 def main():
-    """Основная функция"""
+    """Основная функция."""
     logging.debug('Бот запущен')
     current_timestamp = 0
     sent_message = None
