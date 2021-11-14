@@ -28,7 +28,6 @@ HOMEWORK_STATUSES = {
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s, %(levelname)s, %(name)s, %(message)s',
-    # filename='main.log'
 )
 
 logger = logging.getLogger(__name__)
@@ -61,14 +60,13 @@ def get_api_answer(current_timestamp):
     except requests.RequestException as e:
         error = ('Ошибка:\n\n' + str(e))
         logging.error(error)
-        return {}
     except json.decoder.JSONDecodeError as e:
         error = (
             'Не удастся десериализовать JSON'
             'полученный из запроса.'
             f'\n\nОшибка: {str(e)}')
         logging.error(error)
-        return {}
+    return {}
 
 
 def check_response(response):
@@ -84,8 +82,12 @@ def check_response(response):
 
 def parse_status(homework):
     """Парсит домашку и возвращает вердикт."""
-    homework_name = homework['homework_name']
-    homework_status = homework['status']
+    try:
+        homework_name = homework['homework_name']
+        homework_status = homework['status']
+    except KeyError as e:
+        logging.error(f'В ответе нет ключа {e}')
+        raise KeyError(f'В ответе нет ключа {e}')
 
     try:
         verdict = HOMEWORK_STATUSES[homework_status]
@@ -117,33 +119,34 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-    if check_tokens():
-        bot = telegram.Bot(token=TELEGRAM_TOKEN)
-        logging.debug('Бот запущен')
-        current_timestamp = 0
-        sent_message = None
-        while True:
-            try:
-                response = get_api_answer(current_timestamp)
-                homeworks = check_response(response)
-                homework = homeworks[0]
-                message = parse_status(homework)
-
-                current_timestamp = response['current_date']
-                if sent_message != message:
-                    send_message(bot, message)
-                    sent_message = message
-                time.sleep(RETRY_TIME)
-
-            except Exception as error:
-                message = f'Сбой в работе программы: {error}'
-                logging.error(f'Бот упал с ошибкой: {error}')
-                if sent_message != message:
-                    send_message(bot, message)
-                    sent_message = message
-                time.sleep(RETRY_TIME)
-    else:
+    if not check_tokens():
         logging.debug('Работа бота остановлена.')
+        exit()
+
+    bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    logging.debug('Бот запущен')
+    current_timestamp = 0
+    sent_message = None
+    while True:
+        try:
+            response = get_api_answer(current_timestamp)
+            homeworks = check_response(response)
+            homework = homeworks[0]
+            message = parse_status(homework)
+
+            current_timestamp = response['current_date']
+            if sent_message != message:
+                send_message(bot, message)
+                sent_message = message
+            time.sleep(RETRY_TIME)
+
+        except Exception as error:
+            message = f'Сбой в работе программы: {error}'
+            logging.error(f'Бот упал с ошибкой: {error}')
+            if sent_message != message:
+                send_message(bot, message)
+                sent_message = message
+            time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':
